@@ -204,7 +204,16 @@ have_parts() {
 }
 fetch() { # url dest sha
   mkdir -p "$(dirname "$2")"
-  curl -fL --retry 5 -C - -o "$2" "$1" || die "download failed: $1"
+  # Already on disk and verified (an earlier run, or a hand-run curl after a dropped connection): don't download again.
+  if [ -s "$2" ] && [ "$(sha "$2")" = "$3" ]; then
+    say "    $2 already here (sha256 ok, not downloaded again)"
+    return 0
+  fi
+  # --http1.1: mobile/hotspot links drop HTTP/2 streams mid-transfer (curl 92, "stream was not closed cleanly").
+  # --retry-all-errors: also retry the resets and partial-transfer errors, not just the 5xx family.
+  # A failed download keeps the partial file, so re-running resumes instead of starting over.
+  curl -fL --http1.1 --retry 8 --retry-all-errors --retry-delay 5 -C - -o "$2" "$1" \
+    || die "download failed: $1 (partial $2 kept: run again to resume)"
   [ "$(sha "$2")" = "$3" ] || { rm -f "$2"; die "checksum mismatch for $1 (file deleted, run again)"; }
 }
 
