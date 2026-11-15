@@ -91,6 +91,13 @@ if [ -z "$BUILD_TYPE" ]; then
     printf '  GPU:           %s (%s)\n' "${DETECTED_GPU_NAME:-Unknown}" "${DETECTED_GPU_VENDOR:-Unknown}"
     printf '  GPU Config:    GPU_SOFTWARE=%s, GPU_VULKAN=%s, LOAD_I915=%s\n' \
       "${DETECTED_GPU_SW}" "${DETECTED_GPU_VK}" "${DETECTED_LOAD_I915}"
+    if [ -n "$DETECTED_ISA_NATIVE$DETECTED_ISA_EMULATED" ]; then
+      printf '  ISA native:    %s\n' "${DETECTED_ISA_NATIVE# }"
+      printf '  ISA emulated:  %s (kernel #UD emulator)\n' "${DETECTED_ISA_EMULATED# }"
+      case " $DETECTED_ISA_NATIVE " in
+        *" sha_ni "*) printf '  SHA-NI:        native -> libcrypto patches are skipped at boot\n' ;;
+      esac
+    fi
     if [ -n "$DETECTED_RESOLUTION" ]; then
       printf '  Display:       %s (Optimal UI Density: %s DPI)\n' "$DETECTED_RESOLUTION" "$DETECTED_DENSITY"
     else

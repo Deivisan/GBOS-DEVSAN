@@ -60,15 +60,31 @@ Risco real: o HAL `dras` do Google ainda não reconhece o cartão em algumas má
 
 ## Armazenamento e instalação
 
-Hoje os dois discos estão com 100% do espaço alocado (NVMe: `C:` de 237,5 GB; SATA: `D:` de 223,6 GB), sem
-espaço não alocado. O instalador do gbOS86:
+**Estado desde 2026-11-15** (o `D:` foi encolhido em 48 GB para abrir espaço de instalação sem tirar nada dos jogos):
 
-- prefere NVMe; para usar o SATA (Kingston) é preciso `INSTALL_DISK=sda` no `gbos.cfg`;
-- em dual-boot **não** mexe nas partições existentes, só usa espaço **não alocado** (≥ 24 GB recomendado);
-- exige o disco em modo **AHCI** no BIOS (não RST/RAID/VMD — o kernel não tem `CONFIG_VMD`).
+| Disco 0 (SATA 223,6 GB, GPT) | Tamanho | Papel |
+|---|---|---|
+| p1 | 16 MB | MSR (reservado do Windows) |
+| p2 `D:` NTFS | 175,55 GB (56,9 GB livres) | jogos — intacto |
+| **p3 `GBOS_EFI`** | 512 MB FAT32, tipo EFI System | ESP **dedicada** do gbOS (não é a do Windows) |
+| *não alocado* | **47,5 GB** | o instalador põe aqui `GBOSSYS` (8 GiB) + `GBOS_DATA` (o resto) |
 
-Ou seja: instalar de verdade exige encolher `C:` (Gerenciamento de Disco → Encolher Volume, ≥ 24 GB) ou aceitar
-um install limpo. Até lá, **live USB em RAM** (`MODE=live`) valida tudo sem tocar em disco.
+O disco 1 (NVMe, 238 GB) continua inteiro para o Windows.
+
+Por que a ESP dedicada: o instalador procura a ESP **no disco alvo** (`sfdisk -d` pelo GPT type) e só cai para
+`findfs LABEL=...` em outros discos se não achar. Sem a `GBOS_EFI`, ele gravaria em `\EFI\gbos86\` na ESP de
+100 MB do Windows — que é apertada (exige 45 MB livres) e não é nossa.
+
+Regras que continuam valendo:
+
+- o disco precisa estar em **AHCI** no BIOS (não RST/RAID/VMD — o kernel não tem `CONFIG_VMD`);
+- dual-boot **não** mexe em partição existente; exige ≥ 17 GB não alocados (temos 47,5 GB);
+- para o alvo ser o SATA com um NVMe presente é preciso `INSTALL_DISK=sda` no `gbos.cfg`;
+- depois de instalar, o kernel fica em `EFI/gbos86/BOOTX64.EFI` na `GBOS_EFI`: para o firmware achar sozinho,
+  ou se cria a entrada NVRAM (`efibootmgr`) ou se copia o kernel para `EFI/BOOT/BOOTX64.EFI` dessa ESP (o
+  caminho de fallback que a BIOS/F12 lista como "UEFI OS" do disco).
+
+Até o porte estar estável, **live USB em RAM** (`MODE=live`) valida tudo sem tocar em disco.
 
 ## Ambiente de build nesta máquina
 

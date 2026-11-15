@@ -51,24 +51,43 @@ hardware real**, que o upstream marca explicitamente como `untested on hardware`
 
 | Fase | O que | Critério de pronto |
 |---|---|---|
-| 0 | Fork + inventário + gate SHA-NI + detect AMD | **feito** (este commit) |
-| 1 | Build do stick nesta máquina (WSL2 + docker, `./build.sh --auto`) | `dist/gbOS86-*.img` gerado |
+| 0 | Fork + inventário + gate SHA-NI + detect AMD | **feito** (commits `16492e2`, `ceaf1eb`) |
+| 0.5 | Espaço de instalação no `D:`: encolhido em 48 GB, ESP `GBOS_EFI` (512 MB) criada, 47,5 GB não alocados | **feito** (2026-11-15) |
+| 1 | Build do stick nesta máquina (WSL2 + docker, `./build.sh` opção **3**) | `dist/gbOS86-*.img` gerado |
 | 2 | Boot **live em RAM** no PC, monitor na iGPU | chega ao desktop (ou logs em `gbos/logs/boot-N/`) |
 | 3 | Coletar `hwdetect.txt`, `stage0-dmesg.txt`, `logcat.txt*`, `display.txt` | evidência suficiente para decidir GPU/áudio |
 | 4 | RADV estável (gralloc + HWC + cursor) | apps abrem sem crash-loop |
 | 5 | Áudio pelo codec onboard | som nos speakers/line-out |
-| 6 | Instalar no disco (SATA ou espaço encolhido do NVMe) | boot sem stick, `/data` persistente |
+| 6 | Instalar no disco (`INSTALL_DISK=sda`, dual-boot nos 47,5 GB) + entrada de boot | boot sem stick, `/data` persistente |
+
+### Fase 1: o que o `--dry-run` já disse (2026-11-15)
+
+```
+This will download:
+  - Google's recovery image: https://dl.google.com/device/recovery/lapis-user/16693588/recovery.zip (7.7 GB)
+  - busybox-static from Debian via docker (about 1 MB)
+  - gbos86-modules-6.18.21-gbos-whl-r5.tar.xz (14 MB, release do projeto)
+  - gbos86-firmware-12dfe670-sof2026.09.2-r4.tar.xz (70 MB, release do projeto)
+  - gbos86-swr-r1.tar.xz (software GPU driver for AMD graphics, 6 MB, release)
+  - KernelSU_v3.3.1_32680-release.apk + ksud (19 MB, release do KernelSU)
+```
+
+**7,81 GB no total e nenhum kernel é compilado** (módulos e firmware vêm prontos do release): o custo é quase
+todo download, ~30-60 min. Escolher a opção **3 (Standard generic live USB installer, `MODE=ask`)** — a opção 2
+pré-configura `/dev/sda` a partir do `/dev/sda` do **WSL**, que não é o disco físico.
+
+RADV **não** vem nesse download (só SwiftShader): o `GPU_VULKAN=auto` do boot cai para SwiftShader até rodarmos
+`tools/radv-android/build.sh` (fase 4).
 
 ### Comandos da fase 1 (a rodar dentro do WSL, não no PowerShell)
 
 ```
 # daemon do Docker Desktop precisa estar rodando
 cd /mnt/c/Projetos/GBOS-DEVSAN
-./build.sh --dry-run      # mostra o que baixa (imagem do Google 7,7 GB, busybox, firmwares)
-./build.sh --auto         # ~30-60 min, a maior parte download
+sh build.sh          # escolher 3
 ```
 
-Depois: `dist/gbOS86-*.img` → gravar no pendrive com Rufus/balenaEtcher (ou `dd`), boot por F12, Secure Boot off.
+Depois: `dist/gbOS86-*.img` → gravar no pendrive com Rufus/balenaEtcher, boot por F12, Secure Boot off.
 
 ## Limites que eu não vou furar
 
