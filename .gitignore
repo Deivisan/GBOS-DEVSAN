@@ -78,3 +78,6 @@ __pycache__/
 # (the kernel only accepts a manager APK with the official signing certificate)
 /usb/ksu/manager.apk
 /usb/ksu/ksud
+
+# Backup local do ISO do Ventoy/E: antes de gravar a imagem (8 GB, nunca versionar)
+/backup-ventoy/
