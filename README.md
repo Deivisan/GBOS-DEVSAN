@@ -1,5 +1,15 @@
 # gbos-x86 (gbOS86)
 
+> **Fork arquivado em 2026-11-15.** `GBOS-DEVSAN` foi a tentativa de rodar o gbOS86 num desktop AMD
+> (Ryzen 7 5700G, iGPU Vega `1002:1638`). A imagem bootou e chegou ao sistema em modo live, mas ficou lenta
+> ao ponto de não dar para usar. O desenvolvimento parou aqui, esperando o upstream amadurecer — ver
+> [`docs/DEVSAN-ARCHIVE.md`](docs/DEVSAN-ARCHIVE.md) (o que foi feito, por que parou, como retomar) e
+> [`docs/DEVSAN-BOOT-REPORT-01.md`](docs/DEVSAN-BOOT-REPORT-01.md) (o boot que funcionou).
+> Upstream: [linuxkid473/gbos-x86](https://github.com/linuxkid473/gbos-x86).
+>
+> **Archived fork (2026-11-15).** It boots on an AMD Ryzen 7 5700G (Vega iGPU) but the live session was
+> unusably slow. Development paused until upstream matures; see the docs above.
+
 <p align="center"><img src="docs/demo.gif" alt="gbOS86 running on a Dell Latitude 5300" height="420">&nbsp;&nbsp;<img src="docs/screenshot-dell-latitude-5300.jpg" alt="Googlebook OS on a Dell Latitude 5300" height="420"></p>
 <p align="center"><b>Googlebook OS on a Dell Latitude 5300.</b> Full 43 s demo: <a href="https://gbos86.com/static/demo.mp4">gbos86.com/static/demo.mp4</a></p>
 

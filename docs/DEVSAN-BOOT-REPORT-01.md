@@ -12,12 +12,22 @@ Primeiro boot real do gbOS86 nesta máquina, com o SSD Crucial BX500 240 GB por 
 
 ## O que aconteceu (relato do usuário)
 
+> "Entrou no sistema, eu selecionei a opção para realmente ser live CD. O mouse mexia, mas muito lentamente
+> e desisti de debugar."
+
 > "Até botou, ficou muito lento, muito lento mesmo. Ficou quase inutilizável tudo. Então não deu pra usar,
 > nem mexer, nem ele dizer como que foi."
 
-- O sistema **bootou** — não foi tela preta, não foi kernel panic.
-- Ficou lento a ponto de não permitir interação nem leitura de diagnóstico na tela.
-- Nenhuma informação foi coletada manualmente durante o boot.
+- O menu apareceu e a escolha foi **live** (não o instalador). O sistema **bootou até o Android** — não foi
+  tela preta, não foi kernel panic, não foi reboot.
+- O ponteiro do mouse **respondia**, ou seja: entrada, compositor e display estavam funcionando. Faltava
+  velocidade — latência alta o suficiente para inviabilizar qualquer operação e a leitura de diagnóstico na tela.
+- A depuração foi abandonada antes de coletar `logcat`/`kmsg` na mão. **Os logs do boot continuam no SSD**
+  (`GBOS/gbos/logs/boot-N/`), gravados pelo stage0 automaticamente; nada foi lido ainda porque o SSD não
+  estava plugado no Windows depois do teste.
+
+**Status: encerrado sem diagnóstico fechado.** O projeto foi arquivado em 2026-11-15
+(`docs/DEVSAN-ARCHIVE.md`).
 
 ## O que o código de boot faz (fonte: `usb/stage0_init.sh`, o mesmo embutido no kernel)
 
