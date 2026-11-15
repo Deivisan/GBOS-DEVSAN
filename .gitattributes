@@ -14,3 +14,11 @@
 *.sed   text eol=lf
 *.bat   text eol=crlf
 *.ps1   text eol=crlf
+
+# Extension-less text files that scripts read/source. lapis/BUILD is sourced by build.sh: with CRLF the download URL
+# ends in a \r and curl answers "URL rejected: Malformed input to a URL function".
+lapis/BUILD                    text eol=lf
+kernel/ci/BUILD_INFO           text eol=lf
+kernel/docker/Dockerfile       text eol=lf
+tools/erofs-docker/Dockerfile  text eol=lf
+kernel/v4l2loopback/Makefile   text eol=lf
