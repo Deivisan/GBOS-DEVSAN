@@ -76,11 +76,28 @@ detect_host_hardware() {
   DETECTED_CPU_NAME=""
   DETECTED_CPU_AVX=0
   DETECTED_CPU_AVX2=0
+  DETECTED_CPU_VENDOR=""
+  DETECTED_ISA_NATIVE=""
+  DETECTED_ISA_EMULATED=""
 
   if [ -f /proc/cpuinfo ]; then
     DETECTED_CPU_NAME=$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^[ \t]*//')
     grep -qw avx /proc/cpuinfo 2>/dev/null && DETECTED_CPU_AVX=1
     grep -qw avx2 /proc/cpuinfo 2>/dev/null && DETECTED_CPU_AVX2=1
+    case "$(grep -m1 '^vendor_id' /proc/cpuinfo 2>/dev/null)" in
+      *AuthenticAMD*) DETECTED_CPU_VENDOR="AMD" ;;
+      *GenuineIntel*) DETECTED_CPU_VENDOR="Intel" ;;
+    esac
+    # The five extensions Google's lapis binaries use and pre-2021 x86 CPUs lack (kernel/isa_emu_patch). Which of them the
+    # host runs natively decides how much the #UD emulator costs; SHA-NI also decides whether the libcrypto patches are a
+    # win (no SHA-NI: yes) or a slowdown (native SHA-NI: they are skipped, see usb/hook.sh).
+    for _ext in sha_ni gfni avx_vnni avx_ifma vaes vpclmulqdq; do
+      if grep -qw "$_ext" /proc/cpuinfo 2>/dev/null; then
+        DETECTED_ISA_NATIVE="$DETECTED_ISA_NATIVE $_ext"
+      else
+        DETECTED_ISA_EMULATED="$DETECTED_ISA_EMULATED $_ext"
+      fi
+    done
   elif command -v sysctl >/dev/null 2>&1; then
     DETECTED_CPU_NAME=$(sysctl -n machdep.cpu.brand_string 2>/dev/null)
     _feats=$(sysctl -n machdep.cpu.features machdep.cpu.leaf7_features 2>/dev/null | tr '[:upper:]' '[:lower:]')
@@ -152,6 +169,14 @@ detect_host_hardware() {
     _intel_modern=1
   fi
 
+  # No DRM card here (docker, WSL, a VM, or building on a machine that is not the target): fall back to the CPU vendor, so
+  # an AMD host is not tailored as if it had Intel graphics. hook.sh still only uses RADV when amdgpu is bound at boot.
+  _gpu_assumed=0
+  if [ -z "$_pci_vendor" ] && [ "$DETECTED_CPU_VENDOR" = AMD ]; then
+    _pci_vendor="0x1002"
+    _gpu_assumed=1
+  fi
+
   case "$_pci_vendor" in
     0x8086)
       DETECTED_GPU_VENDOR="Intel"
@@ -169,6 +194,7 @@ detect_host_hardware() {
     0x1002)
       DETECTED_GPU_VENDOR="AMD"
       DETECTED_GPU_NAME="AMD Radeon Graphics"
+      [ "$_gpu_assumed" = 1 ] && DETECTED_GPU_NAME="AMD Radeon Graphics (assumed from the AMD CPU: no DRM card on the build host)"
       DETECTED_LOAD_I915=auto
       DETECTED_XE_PARAMS=""
       DETECTED_GPU_SW=auto
@@ -338,12 +364,21 @@ print_hardware_report() {
   printf '\n================ gbOS86 Host Hardware Profile ================\n'
   printf '  Device Model:  %s\n' "${DETECTED_DEVICE_MODEL:-Unknown Device}"
   printf '  CPU:           %s\n' "${DETECTED_CPU_NAME:-Unknown CPU}"
+  printf '  CPU Features:  '
   if [ "$DETECTED_CPU_AVX2" = 1 ]; then
-    printf '  CPU Features:  AVX=yes, AVX2=yes (Fully compatible with gbOS86)\n'
+    printf 'AVX=yes, AVX2=yes (Fully compatible with gbOS86)\n'
   elif [ "$DETECTED_CPU_AVX" = 1 ]; then
-    printf '  CPU Features:  AVX=yes, AVX2=NO [WARNING: AVX2 missing; AOSP init will SIGILL]\n'
+    printf 'AVX=yes, AVX2=NO [WARNING: AVX2 missing; AOSP init will SIGILL]\n'
   else
-    printf '  CPU Features:  AVX=NO,  AVX2=NO [WARNING: Incompatible legacy CPU]\n'
+    printf 'AVX=NO,  AVX2=NO [WARNING: Incompatible legacy CPU]\n'
+  fi
+  if [ -n "$DETECTED_ISA_NATIVE$DETECTED_ISA_EMULATED" ]; then
+    printf '  ISA native:    %s\n' "${DETECTED_ISA_NATIVE# }"
+    printf '  ISA emulated:  %s (kernel #UD emulator)\n' "${DETECTED_ISA_EMULATED# }"
+    case " $DETECTED_ISA_NATIVE " in
+      *" sha_ni "*)
+        printf '  SHA-NI:        native -> libcrypto patch lines are skipped (scalar code would be slower)\n' ;;
+    esac
   fi
   printf '  GPU:           %s (%s)\n' "${DETECTED_GPU_NAME}" "${DETECTED_GPU_VENDOR}"
   printf '  GPU Config:    GPU_SOFTWARE=%s, GPU_VULKAN=%s, LOAD_I915=%s\n' \

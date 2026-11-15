@@ -2,6 +2,11 @@
 
 Read `README.md` (what/how) and `HANDOFF.md` (chronological log of every bug and fix) first.
 
+**This fork is `Deivisan/GBOS-DEVSAN`**: the target machine is not a laptop and not Intel. It is a desktop
+(Ryzen 7 5700G, Zen 3, Radeon Vega iGPU, B450M, UEFI) — read `docs/DEVSAN-HARDWARE.md` (measured inventory,
+what is native vs. emulated) and `docs/DEVSAN-PORT.md` (decisions, risks, roadmap) before changing anything for
+it. `upstream` points at `linuxkid473/gbos-x86`; keep changes generic enough to survive a rebase onto it.
+
 ## Hard rules
 - **Never erase the user's NVMe without them typing the serial on the laptop.** Don't add bypasses.
   `gbos_install_confirm=` on the kernel cmdline exists for QEMU tests only.

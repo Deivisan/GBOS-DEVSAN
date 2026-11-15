@@ -54,6 +54,21 @@ expect "mount --bind called for libz" "--bind $G/patched/system.libz.so $T/new/s
 expect "mount --bind called for km_compat" "--bind $G/libkm_compat.so $T/new/system/lib64/libkm_compat.so" $MNT
 reject "apex/watch lines ignored" "libcrypto" $MNT
 
+# Native SHA-NI (AMD Zen, Intel Ice Lake+): the libcrypto patch forces scalar SHA-256, so it is skipped there and the
+# original stays; every other line is still bound. GBOS_NATIVE_SHA overrides the probe so the test does not depend on the
+# CPU it runs on.
+echo orig-sys-libcrypto > $T/new/system/lib64/libcrypto.so
+S4=$(sha256sum $T/new/system/lib64/libcrypto.so | cut -d' ' -f1)
+echo patched > $G/patched/system.libcrypto.so
+mkman "early $T/new/system/lib64/libcrypto.so $S4 patched/system.libcrypto.so
+early $T/new/system/lib64/libz.so $S1 patched/system.libz.so"
+reset; GBOS_NATIVE_SHA=1 gbos_bind_patches
+expect "native SHA-NI: libcrypto kept as Google built it" "kept as Google built it (CPU has native SHA-NI"
+expect "native SHA-NI: status counts the skip" "PATCH-STATUS 1 applied, 0 not applied, 1 skipped (native SHA-NI)"
+if grep -q 'libcrypto' $MNT; then echo "FAIL mounted over libcrypto with native SHA-NI"; cat $MNT; FAIL=1; else echo "ok   no mount over libcrypto with native SHA-NI"; fi
+reset; GBOS_NATIVE_SHA=0 gbos_bind_patches
+expect "no native SHA-NI: libcrypto patch is bound" "--bind $G/patched/system.libcrypto.so $T/new/system/lib64/libcrypto.so" $MNT
+
 mkman "early $T/new/system/lib64/libz.so $WRONG patched/system.libz.so"
 reset; gbos_bind_patches
 expect "changed original is NOT patched" "NOT patched (original is $S1, patch was made for $WRONG: run tools/port_build.sh)"
@@ -100,6 +115,13 @@ expect "chroot still runs" "chroot /new /system/bin/dmctl a"
 rm $G/patched/MANIFEST; GBOS_EARLY_DONE=; reset; chroot /new /system/bin/dmctl a
 expect "no MANIFEST: boot continues" "chroot /new /system/bin/dmctl a"
 
+# native SHA-NI: the early pass must not bind libcrypto before the first dmctl either
+mkman "early $T/new/system/lib64/libcrypto.so $S4 patched/system.libcrypto.so
+early $T/new/system/lib64/libz.so $S1 patched/system.libz.so"
+GBOS_EARLY_DONE=; reset; GBOS_NATIVE_SHA=1 chroot /new /system/bin/dmctl a
+expect "early: libcrypto skipped with native SHA-NI" "early: $T/new/system/lib64/libcrypto.so kept as Google built it"
+expect "early: libz still bound" "early: patched $T/new/system/lib64/libz.so"
+
 echo "== apex_patch.sh"
 A=$T/apex; mkdir -p $A/com.a/lib64 $A/com.b/lib64 $A/com.c/lib64 "$A/com.a@1/lib64"
 echo apex-orig > $A/com.a/lib64/libcrypto.so; echo apex-orig > $A/com.b/lib64/libcrypto.so; echo other > $A/com.c/lib64/libcrypto.so
@@ -109,11 +131,17 @@ mkdir -p $T/pi/gbos/patched; echo patched > $T/pi/gbos/patched/conscrypt.libcryp
 printf 'apex lib64/libcrypto.so %s patched/conscrypt.libcrypto.so\nearly /x %s patched/x\n' $AS $WRONG > $T/pi/gbos/patched/MANIFEST
 sed "s#/postinstall/gbos#$T/pi/gbos#g; s#/apex/\*#$A/*#g" $H/apex_patch.sh > $T/apex_patch.sh
 reset
-. $T/apex_patch.sh
+GBOS_NATIVE_SHA=0 . $T/apex_patch.sh
 expect "APEX copy with the pinned hash is bound" "apex_patch: patched $A/com.a/lib64/libcrypto.so"
 expect "second identical copy is bound" "apex_patch: patched $A/com.b/lib64/libcrypto.so"
 expect "different copy is left alone and logged" "apex_patch: $A/com.c/lib64/libcrypto.so left alone"
 reject "versioned @ dirs skipped" "com.a@1"
 [ "$(grep -c -- '-o bind' $MNT)" = 2 ] && echo "ok   exactly two APEX mounts" || { echo "FAIL expected two APEX mounts"; cat $MNT; FAIL=1; }
+
+# native SHA-NI: the APEX copies are left alone (Google's own SHA-NI code runs natively there)
+reset
+GBOS_NATIVE_SHA=1 . $T/apex_patch.sh
+expect "apex: skipped with native SHA-NI" "apex_patch: skipped lib64/libcrypto.so (CPU has native SHA-NI)"
+[ ! -s $MNT ] && echo "ok   no APEX mount with native SHA-NI" || { echo "FAIL APEX mount with native SHA-NI"; cat $MNT; FAIL=1; }
 
 [ $FAIL = 0 ] && echo PORT_SCRIPTS_PASS || { echo PORT_SCRIPTS_FAIL; exit 1; }

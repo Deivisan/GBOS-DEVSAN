@@ -5,8 +5,18 @@
 # and the patched file; a copy with any other hash is left alone and logged, so a new Google build shows up here.
 M=/postinstall/gbos/patched/MANIFEST
 [ -f $M ] || { log -t gbos "apex_patch: $M missing"; exit 0; }
+# Native SHA-NI (AMD Zen, Intel Ice Lake+): the patch forces scalar SHA-256, which is slower there. Same rule as
+# hook.sh/early_patch.sh; GBOS_NATIVE_SHA=0|1 overrides the probe.
+gbos_sha=${GBOS_NATIVE_SHA:-auto}
+if [ "$gbos_sha" = auto ]; then
+  grep -qw sha_ni ${CPUINFO:-/proc/cpuinfo} 2>/dev/null && gbos_sha=1 || gbos_sha=0
+fi
 while read -r kind rel want file rest; do
   [ "$kind" = apex ] || continue
+  if [ "$gbos_sha" = 1 ]; then
+    log -t gbos "apex_patch: skipped $rel (CPU has native SHA-NI)"
+    continue
+  fi
   P=/postinstall/gbos/$file
   [ -f $P ] || { log -t gbos "apex_patch: $P missing"; continue; }
   for d in /apex/*; do

@@ -13,13 +13,26 @@ fi
 # the hash it found, which is what tools/port_build.sh needs to regenerate the patch. kind "early" = also bound by early_patch.sh
 # before the first dmctl (then already mounted here), "apex" lines belong to apex_patch.sh.
 gbos_bind_patches() {
-  gp_ok=0; gp_bad=0
+  gp_ok=0; gp_bad=0; gp_skip=0
   if [ ! -f $G/patched/MANIFEST ]; then
     log "hook: PATCH-STATUS patched/MANIFEST missing: no library patches (SHA-NI/AVX-VNNI code will be emulated, very slow)"
     return 0
   fi
+  # libcrypto patches redirect SHA-NI SHA-256 to scalar code (see early_patch.sh): correct and necessary on a CPU without
+  # SHA-NI, a slowdown on one that has it (AMD Zen, Intel Ice Lake and newer). Leave Google's original there in that case.
+  gp_sha=${GBOS_NATIVE_SHA:-auto}
+  if [ "$gp_sha" = auto ]; then
+    grep -qw sha_ni ${CPUINFO:-/proc/cpuinfo} 2>/dev/null && gp_sha=1 || gp_sha=0
+  fi
   while read -r gp_kind gp_target gp_want gp_file gp_rest; do
     case $gp_kind in early|bind) ;; *) continue;; esac
+    case $gp_target in
+      */libcrypto.so)
+        if [ "$gp_sha" = 1 ]; then
+          log "hook: $gp_target kept as Google built it (CPU has native SHA-NI, the patch forces scalar code)"
+          gp_skip=$((gp_skip+1)); continue
+        fi;;
+    esac
     if grep -q " $gp_target " /proc/mounts; then
       log "hook: $gp_target already patched (early_patch.sh)"; gp_ok=$((gp_ok+1))
     elif [ ! -f $G/$gp_file ]; then
@@ -37,7 +50,11 @@ gbos_bind_patches() {
       fi
     fi
   done < $G/patched/MANIFEST
-  log "hook: PATCH-STATUS $gp_ok applied, $gp_bad not applied"
+  if [ "$gp_skip" != 0 ]; then
+    log "hook: PATCH-STATUS $gp_ok applied, $gp_bad not applied, $gp_skip skipped (native SHA-NI)"
+  else
+    log "hook: PATCH-STATUS $gp_ok applied, $gp_bad not applied"
+  fi
 }
 # Google's userspace needs AVX2: the dynamic linker and bionic libc (__linker_init: vxorps/vmovups ymm, vpbroadcastb)
 # use AVX2 instructions, and the kernel's emulator only covers the newer extensions (GFNI, VNNI, SHA-NI, ...),
