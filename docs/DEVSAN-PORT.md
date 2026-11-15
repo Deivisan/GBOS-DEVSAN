@@ -60,6 +60,26 @@ hardware real**, que o upstream marca explicitamente como `untested on hardware`
 | 5 | Áudio pelo codec onboard | som nos speakers/line-out |
 | 6 | Instalar no disco (`INSTALL_DISK=sda`, dual-boot nos 47,5 GB) + entrada de boot | boot sem stick, `/data` persistente |
 
+### Fase 1: o build real neste host (2026-11-15)
+
+Imagem gerada: `dist/gbOS86-20261115.img` — 6,3 GB, ESP 256M + GBOS 6G, sha256
+`86d137ed…`, kernel 33,5 MB na ESP, `super.img` 3,44 GiB no `gbos/`.
+
+Cinco armadilhas custaram tempo, todas de **host Windows**, nenhuma do projeto:
+
+| Sintoma | Causa | Fix no fork |
+|---|---|---|
+| `set: Illegal option -` | checkout Windows com CRLF (o repo é feito pra Linux) | `.gitattributes` + `core.autocrlf=false` (commit `ceaf1eb`, `54c1d9c`) |
+| `curl: (3) URL rejected` | `lapis/BUILD` sem extensão ficou CRLF → URL com `\r` | idem (arquivo listado no `.gitattributes`) |
+| `EXIT=1` no menu | `printf '3\ny\n' \| sh build.sh`: o `read` do dash bufferiza e o 2º read vê EOF | usar `--standard --yes` |
+| `docker is installed but not running` | engine do Docker Desktop cai; integração WSL nunca esteve ligada | `settings-store.json`: `integratedWslDistros=["Ubuntu"]`, `wslEngineEnabled=true` |
+| `CP .../busybox: No such file` e `mcopy .../efi/EFI: No such file` | bind mount do Docker Desktop sobre `/mnt/c` entrega visão **vazia** ao container (nas duas direções) | `docker cp`/stdout pro busybox; `tools/make_gbos86_image_native.sh` pra imagem |
+
+E uma de rede: link instável derrubou o download da imagem do Google com `curl: (92) HTTP/2 stream not closed`.
+`fetch` agora força `--http1.1`, retenta tudo e **pula** arquivo cujo sha256 já confere. O primeiro trecho tinha
+vindo por Wi-Fi e morreu em BSOD deixando **312 MB corrompidos** entre 1,74 e 2,06 GB; localizei comparando
+janelas de 8 KB com `Range` do servidor e baixei só esse span, em vez dos 7,2 GB inteiros.
+
 ### Fase 1: o que o `--dry-run` já disse (2026-11-15)
 
 ```
