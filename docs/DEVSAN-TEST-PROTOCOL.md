@@ -3,6 +3,25 @@
 O que fazer no primeiro boot e **exatamente** o que procurar nos logs. Sem isso, "não abriu o desktop" não vira
 diagnóstico. Tudo o que o sistema produz fica na própria partição do stick: `GBOS/gbos/logs/boot-N/`.
 
+## 0. O que a imagem pode (e não pode) fazer com os discos internos
+
+Auditado no `install.sh` e no `usb/stage0_init.sh` antes do primeiro boot, porque a pergunta é justa: um stick
+bootável com instalador pode apagar o disco do Windows.
+
+- **Menu (`MODE=ask`)**: 15 s de timeout e o default é `1) Run gbOS86 live from this USB`. A opção `3) Boot the
+  installed gbOS86` só aparece — e só vira default — quando existe `GBOSSYS` num disco interno. Aqui não existe.
+- **Escolha 1 (live)**: `FROM=stick`, então `/data` e `/metadata` são **tmpfs**. A busca por partição ext4 interna
+  (`find_part GBOS_DATA`) só roda com `FROM=nvme`. Nada em disco interno é montado rw nem formatado.
+- **Escolha 2 (install)**: exige *instalar* de verdade. Mostra modelo/serial do alvo, lista as partições que serão
+  perdidas, pede `1) Dual-Boot / 2) Full clean install / 3) Live` e, no caso 2, **exige digitar o serial exato do
+  disco**. Nada é escrito antes disso.
+- **`mkfs`/`sfdisk --wipe`/`dd of=` só existem dentro de `install.sh`** — nenhum outro script da imagem toca partição.
+  O "fake ChromeOS boot disk" do `hook.sh` é um `bootdisk.img` num loop device em RAM (`/dev/loop6`).
+- **Risco real, e é humano**: com dois discos internos o instalador **não recusa** — lista e pergunta
+  `Choose target disk [1-N, default: 1]`, e o default é o NVMe (`nvme0n1`) do Windows. Ou seja: opção 2 + Enter +
+  Enter + serial digitado = Windows apagado. Não usar a opção 2 nesta máquina até existir plano de dualboot
+  consciente (`INSTALL_DISK` no `gbos.cfg`).
+
 ## 1. Gravar e bootar
 
 1. Imagem: `dist/gbOS86-*.img` (padrão: ESP 256 MiB + `GBOS` 6 GiB ≈ 6,3 GB → pendrive de **8 GB ou mais**).
