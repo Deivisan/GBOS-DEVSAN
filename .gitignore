@@ -56,6 +56,11 @@ __pycache__/
 /usb/modules/
 /usb/firmware/iwlwifi-*
 !/usb/firmware/iwlwifi-9000-pu-b0-jf-b0-46.ucode
+# Loose firmware files the build unpacks at this level (the per-vendor directories above are ignored already)
+/usb/firmware/cs42l43.bin
+/usb/firmware/ctefx.bin
+/usb/firmware/mt7662.bin
+/usb/firmware/mt7662_rom_patch.bin
 
 # website runtime data
 /website/data/
