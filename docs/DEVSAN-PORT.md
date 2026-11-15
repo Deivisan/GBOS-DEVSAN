@@ -109,6 +109,28 @@ sh build.sh          # escolher 3
 
 Depois: `dist/gbOS86-*.img` → gravar no pendrive com Rufus/balenaEtcher, boot por F12, Secure Boot off.
 
+## Gravação da imagem no Windows (o que funcionou)
+
+O WSL não anexa mídia removível (`wsl --mount` devolve `0x8007000f`), então a escrita crua sai do
+PowerShell em `\\.\PhysicalDriveN`. Três detalhes custaram tempo até a gravação passar:
+
+1. **`Clear-Disk -RemoveData -RemoveOEM` antes de abrir o device.** Setor que pertence a um volume
+   montado — mesmo sem letra atribuída — devolve `Access denied` na escrita crua. Foi por isso que as
+   primeiras tentativas gravavam só os 257 MB iniciais (GPT + ESP, sem volume) e nada depois.
+2. **`FileStream` comum não serve.** `Flush()` não emite `FlushFileBuffers` num handle de dispositivo:
+   as escritas ficam no cache do Windows, a releitura devolve o conteúdo antigo e o sha256 não bate.
+   Abrir com `[System.IO.FileOptions]::WriteThrough` e chamar `FlushFileBuffers` via kernel32.
+3. **Blocos de 16 MB, `FlushFileBuffers` por bloco**: 6.402 MB em 21,7 s (~296 MB/s). Blocos de 32 MB
+   travaram no primeiro write — o handle fica esperando o serviço VDS terminar o `Clear-Disk`.
+
+Verificação: SHA256 da releitura crua do device contra `Get-FileHash` da imagem. Bateu
+(`86d137edeb0cb57171453598f557123fbfa1dbdf1d9b329e0c51c041b5b289ee`).
+
+**A porta USB importa.** Com a gaveta USB-SATA numa porta frontal/hub o link resetava sob escrita
+contínua — `disk` Event 153 (`E/S repetida no LBA`) seguido de `UASPStor` Event 129
+(`Redefinir para dispositivo, \Device\RaidPort8`) — e a gravação morria entre 257 MB e 2,5 GB.
+Na porta traseira, direto na placa-mãe, passou sem um único reset.
+
 ## Limites que eu não vou furar
 
 - Não apago nem reparticiono disco sem o usuário digitar o serial (regra do `AGENTS.md`).
